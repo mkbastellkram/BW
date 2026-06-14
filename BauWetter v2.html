@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BauWetter Pro</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+    --bg:#f0f2f5; --surface:#fff; --navy:#1a2e4a; --blue:#2563eb;
+    --blue-lt:#dbeafe; --green:#16a34a; --green-lt:#dcfce7;
+    --yellow:#ca8a04; --yellow-lt:#fef9c3; --orange:#ea580c;
+    --orange-lt:#ffedd5; --red:#dc2626; --red-lt:#fee2e2;
+    --muted:#64748b; --border:#e2e8f0; --r:10px; --sh:0 2px 8px rgba(0,0,0,.07);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg);color:var(--navy);-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+
+/* NAV */
+.nav-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);
+    border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(5,1fr);
+    z-index:100;padding-bottom:env(safe-area-inset-bottom)}
+.nav-btn{display:flex;flex-direction:column;align-items:center;padding:8px 4px 6px;
+    font-size:9px;font-weight:600;color:var(--muted);background:none;border:none;
+    cursor:pointer;letter-spacing:.3px;text-transform:uppercase;gap:3px;transition:color .15s}
+.nav-btn .ico{font-size:20px;line-height:1}
+.nav-btn.active{color:var(--blue)}
+
+/* PAGES */
+.page{display:none;padding:14px 13px 85px;min-height:100vh}
+.page.active{display:block}
+
+/* CARD */
+.card{background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);padding:15px;margin-bottom:13px}
+.ct{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:11px}
+
+/* HEADER */
+.ph{display:flex;align-items:center;gap:10px;margin-bottom:15px;padding-top:4px}
+.ph h1{font-size:20px;font-weight:700}
+.step{background:var(--blue);color:#fff;font-size:11px;font-weight:700;border-radius:20px;padding:3px 9px}
+
+/* FORM */
+.fg{margin-bottom:11px;position:relative}
+.fl{display:block;font-size:10px;font-weight:600;color:var(--muted);margin-bottom:4px;
+    text-transform:uppercase;letter-spacing:.4px}
+.fi{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:var(--r);
+    font-size:15px;color:var(--navy);background:var(--surface);
+    -webkit-appearance:none;appearance:none;transition:border-color .15s}
+.fi:focus{outline:none;border-color:var(--blue)}
+.fi:disabled{background:#f8fafc;color:var(--muted)}
+.fi[readonly]{background:#f8fafc}
+
+/* DROPDOWN */
+.dw{display:none;flex-direction:column;background:var(--surface);
+    border:1.5px solid var(--border);border-radius:var(--r);
+    box-shadow:0 8px 24px rgba(0,0,0,.12);margin-top:3px;z-index:500;width:100%}
+.dl{max-height:175px;overflow-y:auto;list-style:none;-webkit-overflow-scrolling:touch}
+.dl li{padding:11px 13px;font-size:14px;border-bottom:1px solid var(--border);cursor:pointer;color:var(--navy)}
+.dl li:active,.dl li:hover{background:var(--blue-lt)}
+.dh{padding:5px 13px;font-size:10px;color:var(--orange);font-weight:700;
+    background:#fafafa;border-top:1px solid var(--border)}
+.sl{font-size:11px;color:var(--muted);margin-top:4px;font-style:italic}
+.sl.ok{color:var(--green);font-weight:600;font-style:normal}
+.sl.warn{color:var(--orange);font-weight:600;font-style:normal}
+
+/* BUTTONS */
+.btn{display:block;width:100%;padding:13px;border:none;border-radius:var(--r);
+    font-size:15px;font-weight:700;cursor:pointer;transition:opacity .15s}
+.btn:active{opacity:.8}
+.btn-p{background:var(--blue);color:#fff}
+.btn-s{background:var(--green);color:#fff}
+.btn-m{background:var(--muted);color:#fff}
+.btn-o{background:transparent;color:var(--blue);border:1.5px solid var(--blue)}
+.btn+.btn{margin-top:8px}
+.brow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* PIN HINT */
+.pin-hint{background:var(--blue-lt);border:1px solid var(--blue);border-radius:var(--r);
+    padding:10px 13px;font-size:12px;color:var(--blue);font-weight:600;margin-bottom:11px}
+
+/* MAP */
+#map-small{height:200px;border-radius:var(--r);border:1px solid var(--border);
+    margin-top:0;background:#e8f0fe}
+.map-status{font-size:11px;color:var(--muted);margin-top:5px;text-align:center;font-style:italic}
+
+/* STATION */
+.station-list{display:flex;flex-direction:column;gap:7px;margin-top:8px}
+.station-item{display:flex;align-items:center;gap:11px;padding:11px 13px;
+    border-radius:var(--r);border:1.5px solid var(--border);cursor:pointer;
+    background:var(--surface);transition:border-color .15s}
+.station-item.selected{border-color:var(--blue);background:var(--blue-lt)}
+.sdot{width:11px;height:11px;border-radius:50%;flex-shrink:0;background:var(--blue)}
+.sname{font-size:13px;font-weight:600}
+.smeta{font-size:10px;color:var(--muted)}
+.sdist{margin-left:auto;font-size:12px;font-weight:700;color:var(--blue);white-space:nowrap}
+
+/* PROJECTS */
+.pi{display:flex;align-items:center;gap:11px;padding:12px 13px;border-radius:var(--r);
+    border:1.5px solid var(--border);margin-bottom:8px;background:var(--surface);cursor:pointer}
+.pi.ap{border-color:var(--green)}
+.pinfo{flex:1;min-width:0}
+.ptit{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pmeta{font-size:10px;color:var(--muted);margin-top:2px}
+.pbadge{font-size:10px;font-weight:700;border-radius:6px;padding:3px 7px;white-space:nowrap}
+.pbadge.ak{background:var(--green-lt);color:var(--green)}
+.pbadge.in{background:#f1f5f9;color:var(--muted)}
+
+/* AMPEL */
+.ag{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}
+.ab{border-radius:var(--r);padding:11px 5px;text-align:center;font-size:10px;
+    font-weight:700;line-height:1.4;color:#fff}
+.ab .ai{font-size:17px;display:block;margin-bottom:3px}
+.ab.gruen{background:var(--green)} .ab.gelb{background:var(--yellow);color:var(--navy)}
+.ab.orange{background:var(--orange)} .ab.rot{background:var(--red)}
+.ab.pending{background:var(--border);color:var(--muted)}
+
+/* KOMPAKT */
+.kg{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}
+.ki{border-radius:var(--r);padding:11px;background:var(--bg);text-align:center}
+.kl{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase}
+.kv{font-size:17px;font-weight:700;margin:3px 0}
+.kr{font-size:10px;color:var(--muted)}
+
+/* HOUR CARDS */
+.hc{display:grid;grid-template-columns:55px 1fr;gap:9px;align-items:start;
+    background:var(--surface);border-radius:var(--r);border-left:5px solid var(--border);
+    padding:10px 11px;margin-bottom:7px;box-shadow:var(--sh)}
+.hc.kern{border-left-color:var(--blue);background:#f8faff}
+.hc.warn{border-left-color:var(--yellow)}
+.hc.krit{border-left-color:var(--red)}
+.tc{text-align:center}
+.thr{font-size:15px;font-weight:700}
+.tbadge{display:inline-block;margin-top:3px;font-size:8px;font-weight:700;
+    border-radius:4px;padding:2px 4px;background:var(--border);color:var(--muted)}
+.tbadge.core{background:var(--blue-lt);color:var(--blue)}
+.dc{display:grid;grid-template-columns:1fr 1fr;gap:3px 9px;font-size:12px}
+.cl{grid-column:span 2;font-weight:700;font-size:13px;margin-bottom:2px}
+.pn{grid-column:span 2;font-size:10px;font-style:italic;color:var(--muted);
+    margin-top:3px;border-top:1px dashed var(--border);padding-top:3px;line-height:1.4}
+.pn b{color:var(--orange);font-style:normal}
+
+/* MISC */
+.loader{display:none;text-align:center;padding:28px;color:var(--blue);font-weight:600}
+.lspin{font-size:26px;display:block;margin-bottom:7px;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.fban{background:var(--orange-lt);border:1px solid var(--orange);border-radius:var(--r);
+    padding:9px 13px;font-size:12px;color:var(--orange);font-weight:600;
+    margin-bottom:11px;display:none}
+.hero{background:linear-gradient(135deg,var(--navy) 0%,#2563eb 100%);border-radius:var(--r);
+    padding:22px 18px;color:#fff;margin-bottom:13px;text-align:center}
+.hero .hlogo{font-size:34px;margin-bottom:7px}
+.hero h2{font-size:19px;font-weight:700;margin-bottom:3px}
+.hero p{font-size:11px;opacity:.8;line-height:1.5}
+.empty{text-align:center;padding:22px;color:var(--muted);font-size:13px}
+.empty .ee{font-size:30px;display:block;margin-bottom:7px}
+.disc{background:#f8fafc;border-left:4px solid var(--muted);border-radius:var(--r);
+    padding:13px;font-size:11px;color:#4a5568;line-height:1.6;margin-bottom:13px}
+</style>
+</head>
+<body>
+
+<!-- ═══ SEITE 1: START ═══════════════════════════════════════════════════ -->
+<div id="page-start" class="page active">
+    <div class="hero">
+        <div class="hlogo">🏗️</div>
+        <h2>BauWetter Pro</h2>
+        <p>Meteorologische Dokumentation<br>für Dachdeckerarbeiten</p>
+    </div>
+    <div class="card">
+        <div class="ct">Aktive Projekte</div>
+        <div id="proj-liste">
+            <div class="empty"><span class="ee">📋</span>Noch kein Projekt angelegt.</div>
+        </div>
+        <button class="btn btn-p" style="margin-top:11px" onclick="zeigePage('adresse',1)">+ Neues Bauvorhaben</button>
+    </div>
+    <div class="disc">
+        <b>Rechtlicher Hinweis:</b> Dieses Protokoll dokumentiert amtliche DWD-Messwerte als Argumentationshilfe. Entscheidungen über Arbeitsunterbrechungen obliegen ausschließlich dem Vorarbeiter/Polier vor Ort in Abstimmung mit dem bauleitenden Meister.
+    </div>
+</div>
+
+<!-- ═══ SEITE 2: ADRESSE ═════════════════════════════════════════════════ -->
+<div id="page-adresse" class="page">
+    <div class="ph"><span class="step">Schritt 1</span><h1>Bauvorhaben</h1></div>
+
+    <div class="card">
+        <div class="ct">Vorgangsnummer</div>
+        <div class="fg">
+            <input type="text" id="vorgangs-nr" class="fi" placeholder="z.B. 2026-0147">
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="ct">Adresssuche</div>
+
+        <!-- PLZ -->
+        <div class="fg">
+            <label class="fl">1 · PLZ oder Ortsname</label>
+            <input type="text" id="plz-input" class="fi" placeholder="z.B. 22041 oder Wandsbek" autocomplete="off">
+            <div id="plz-wrapper" class="dw">
+                <ul id="plz-list" class="dl"></ul>
+                <div id="plz-hint" class="dh">👇 Weitere Orte</div>
+            </div>
+            <div id="plz-status" class="sl">PLZ oder Ortsname eingeben</div>
+        </div>
+
+        <!-- ORT readonly -->
+        <div class="fg">
+            <label class="fl">2 · Bestätigte Region</label>
+            <input type="text" id="ort-input" class="fi" readonly placeholder="Wird automatisch gesetzt">
+        </div>
+
+        <!-- STRASSE -->
+        <div class="fg">
+            <label class="fl">3 · Straße <span id="str-lademsg" style="font-weight:400;font-style:italic"></span></label>
+            <input type="text" id="str-input" class="fi" placeholder="Erst PLZ wählen…" disabled autocomplete="off">
+            <div id="str-wrapper" class="dw">
+                <ul id="str-list" class="dl"></ul>
+                <div class="dh">👇 Weitere Straßen</div>
+            </div>
+            <div id="str-status" class="sl">Gesperrt</div>
+        </div>
+
+        <!-- HAUSNUMMER -->
+        <div class="fg">
+            <label class="fl">4 · Hausnummer</label>
+            <input type="text" id="hnr-input" class="fi" placeholder="Straße wählen…" disabled autocomplete="off">
+            <div id="hnr-wrapper" class="dw">
+                <ul id="hnr-list" class="dl"></ul>
+            </div>
+            <div id="hnr-status" class="sl">Gesperrt</div>
+        </div>
+    </div>
+
+    <!-- KARTE — immer sichtbar nach PLZ-Wahl -->
+    <div id="karte-block" class="card" style="display:none">
+        <div class="ct">Lageplan · Pin antippen zum Präzisieren</div>
+        <div class="pin-hint">📍 Tipp auf die Karte um den Pin exakt zu setzen — auch ohne Straße nutzbar!</div>
+        <div id="map-small"></div>
+        <div id="map-status" class="map-status">Pin auf Kartenposition setzen</div>
+    </div>
+
+    <!-- STATIONEN -->
+    <div id="station-block" class="card" style="display:none">
+        <div class="ct">Nächste DWD-Wetterstationen</div>
+        <div id="station-liste" class="station-list"></div>
+        <div id="station-status" class="sl" style="margin-top:7px">Station wählen</div>
+    </div>
+
+    <button id="btn-speichern" class="btn btn-s" style="display:none" onclick="bauvorhabenSpeichern()">
+        ✅ Bauvorhaben speichern
+    </button>
+</div>
+
+<!-- ═══ SEITE 3: WETTER ══════════════════════════════════════════════════ -->
+<div id="page-wetter" class="page">
+    <div class="ph"><span class="step">Schritt 2</span><h1>Wetterdaten</h1></div>
+
+    <div class="card">
+        <div class="ct">Projekt & Datum</div>
+        <div class="fg">
+            <label class="fl">Bauvorhaben</label>
+            <select id="proj-select" class="fi">
+                <option value="">— Projekt wählen —</option>
+            </select>
+        </div>
+        <div class="fg">
+            <label class="fl">Datum</label>
+            <input type="date" id="datum-input" class="fi">
+        </div>
+        <div class="fg">
+            <label class="fl">Anzeigebereich</label>
+            <select id="bereich-select" class="fi">
+                <option value="24">Vollständig 24h</option>
+                <option value="kern">Nur Kernzeit (07–16 Uhr)</option>
+            </select>
+        </div>
+        <div class="brow">
+            <button class="btn btn-m" onclick="ladePrognose()">📡 Prognose</button>
+            <button class="btn btn-p" onclick="ladeWetter(false)">🌡️ Abrufen</button>
+        </div>
+    </div>
+
+    <div id="fban" class="fban">⚠️ WETTERVORHERSAGE — Kein amtlicher Messwert. Abgerufen: <span id="fts"></span></div>
+
+    <div id="loader" class="loader"><span class="lspin">⟳</span>DWD-Daten werden abgerufen…</div>
+
+    <div id="ampel-block" style="display:none">
+        <div class="card">
+            <div class="ct">Tages-Risikoanalyse · Kernzeit 07–16 Uhr</div>
+            <div class="ag">
+                <div id="amp-chemie"  class="ab pending"><span class="ai">🧪</span>Flüssig-kunststoff</div>
+                <div id="amp-bitumen" class="ab pending"><span class="ai">🔥</span>Abdichtung / Bitumen</div>
+                <div id="amp-montage" class="ab pending"><span class="ai">🏗️</span>Montage / Logistik</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="ct">Tages-Kompaktwerte</div>
+            <div class="kg">
+                <div class="ki"><div class="kl">Temperatur</div><div class="kv" id="k-temp">—</div><div class="kr" id="k-temp-r">Min/Max</div></div>
+                <div class="ki"><div class="kl">Taupunkt</div><div class="kv" id="k-tau">—</div><div class="kr" id="k-tau-r">Min/Max</div></div>
+                <div class="ki"><div class="kl">Luftfeuchte</div><div class="kv" id="k-rf">—</div><div class="kr" id="k-rf-r">Min/Max</div></div>
+                <div class="ki"><div class="kl">Böe max</div><div class="kv" id="k-wind">—</div><div class="kr" id="k-wind-r">⌀ Mittelwind</div></div>
+                <div class="ki" style="grid-column:span 2"><div class="kl">Niederschlag gesamt</div><div class="kv" id="k-regen">—</div><div class="kr" id="k-regen-r">Kernzeit-Stunden</div></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="result-wrap"></div>
+</div>
+
+<!-- ═══ SEITE 4: EXPORT ══════════════════════════════════════════════════ -->
+<div id="page-export" class="page">
+    <div class="ph"><span class="step">Export</span><h1>Bericht</h1></div>
+    <div class="card">
+        <div class="ct">Deckblatt-Daten</div>
+        <div class="fg"><label class="fl">Bauherr</label><input type="text" id="exp-bauherr" class="fi" placeholder="Name des Bauherrn"></div>
+        <div class="fg"><label class="fl">Mitarbeiter (kommagetrennt)</label><input type="text" id="exp-ma" class="fi" placeholder="M. Müller, K. Schmidt…"></div>
+        <div class="fg"><label class="fl">Polier / Vorarbeiter</label><input type="text" id="exp-polier" class="fi" placeholder="Name"></div>
+        <div class="fg"><label class="fl">Bauleitender Meister</label><input type="text" id="exp-meister" class="fi" placeholder="Name"></div>
+    </div>
+    <div class="card">
+        <div class="ct">Ausgabeumfang</div>
+        <label style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px;cursor:pointer"><input type="checkbox" id="exp-kompakt" checked> Kompaktwerte</label>
+        <label style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px;cursor:pointer"><input type="checkbox" id="exp-tabelle" checked> 24h-Stundentabelle</label>
+        <label style="display:flex;align-items:center;gap:10px;padding:9px 0;font-size:14px;cursor:pointer"><input type="checkbox" id="exp-disc" checked> Rechtliche Hinweise</label>
+    </div>
+    <button class="btn btn-m" onclick="exportText()">📋 Text kopieren</button>
+    <button class="btn btn-p" style="margin-top:8px" onclick="alert('PDF-Export folgt in Stufe 2')">🖨️ PDF — folgt in Stufe 2</button>
+    <div class="card" style="margin-top:13px">
+        <div class="ct">Gespeicherte Berichte</div>
+        <div id="archiv-liste"><div class="empty"><span class="ee">📁</span>Noch keine Berichte.</div></div>
+    </div>
+</div>
+
+<!-- ═══ SEITE 5: EINSTELLUNGEN ══════════════════════════════════════════ -->
+<div id="page-settings" class="page">
+    <div class="ph"><h1>Einstellungen</h1></div>
+    <div class="card">
+        <div class="ct">Gewerke-Grenzwerte</div>
+        <div class="fg"><label class="fl">Taupunkt-Abstand Warnung (°C)</label><input type="number" id="set-tau" class="fi" value="3" min="1" max="6"></div>
+        <div class="fg"><label class="fl">Windböe Gelb (km/h)</label><input type="number" id="set-wg" class="fi" value="40" min="20" max="60"></div>
+        <div class="fg"><label class="fl">Windböe Rot / Kran (km/h)</label><input type="number" id="set-wr" class="fi" value="50" min="30" max="80"></div>
+        <div class="fg"><label class="fl">Luftfeuchte Warnung (%)</label><input type="number" id="set-rf" class="fi" value="85" min="60" max="98"></div>
+        <button class="btn btn-s" onclick="alert('Einstellungen übernommen ✅')">Speichern</button>
+    </div>
+    <div class="card">
+        <div class="ct">Datenverwaltung</div>
+        <button class="btn btn-m" onclick="if(confirm('Alle Projekte löschen?')){localStorage.removeItem('bw_projekte');renderProjListe();alert('Gelöscht.')}">🗑️ Alle Projekte löschen</button>
+    </div>
+</div>
+
+<!-- ═══ NAVIGATION ═══════════════════════════════════════════════════════ -->
+<nav class="nav-bar">
+    <button class="nav-btn active" onclick="zeigePage('start',0)"><span class="ico">🏠</span>Start</button>
+    <button class="nav-btn"        onclick="zeigePage('adresse',1)"><span class="ico">📍</span>Adresse</button>
+    <button class="nav-btn"        onclick="zeigePage('wetter',2)"><span class="ico">🌡️</span>Wetter</button>
+    <button class="nav-btn"        onclick="zeigePage('export',3)"><span class="ico">📄</span>Export</button>
+    <button class="nav-btn"        onclick="zeigePage('settings',4)"><span class="ico">⚙️</span>Einst.</button>
+</nav>
+
+<script>
+'use strict';
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+const S = {
+    plz:'', ort:'', strasse:'', hausnr:'',
+    lat:null, lon:null, station:null,
+    wetter:null, istProg:false
+};
+let strCache=[], hnrCache=[], dbTimer;
+let lMap=null, lMarker=null;
+
+// ── PLZ VERZEICHNIS ──────────────────────────────────────────────────────────
+const PLZ=[
+    {p:"20095",o:"Hamburg (Altstadt)",   lat:53.5505,lon:9.9992},
+    {p:"20099",o:"Hamburg (St. Georg)",  lat:53.5557,lon:10.018},
+    {p:"20144",o:"Hamburg (Eimsbüttel)",lat:53.5735,lon:9.9625},
+    {p:"20251",o:"Hamburg (Hoheluft)",  lat:53.5879,lon:9.9756},
+    {p:"20357",o:"Hamburg (Schanzenviertel)",lat:53.5612,lon:9.9663},
+    {p:"21029",o:"Hamburg (Bergedorf)", lat:53.4878,lon:10.2108},
+    {p:"22041",o:"Hamburg (Wandsbek)", lat:53.5714,lon:10.0766},
+    {p:"22043",o:"Hamburg (Marienthal)",lat:53.5642,lon:10.0931},
+    {p:"22045",o:"Hamburg (Tonndorf)", lat:53.5822,lon:10.1199},
+    {p:"22049",o:"Hamburg (Dulsberg)", lat:53.5811,lon:10.0612},
+    {p:"22111",o:"Hamburg (Horn)",     lat:53.5517,lon:10.0932},
+    {p:"22305",o:"Hamburg (Barmbek)", lat:53.5958,lon:10.0333},
+    {p:"22399",o:"Hamburg (Poppenbüttel)",lat:53.6628,lon:10.1022},
+    {p:"22459",o:"Hamburg (Schnelsen)",lat:53.6255,lon:9.9207},
+    {p:"22765",o:"Hamburg (Altona)",   lat:53.5504,lon:9.9347},
+    {p:"24103",o:"Kiel (Innenstadt)", lat:54.3232,lon:10.1227},
+    {p:"24534",o:"Neumünster",        lat:54.0722,lon:9.9822},
+    {p:"24568",o:"Bad Bramstedt",     lat:53.9189,lon:9.8825},
+    {p:"23552",o:"Lübeck (Innenstadt)",lat:53.8654,lon:10.6865},
+    {p:"30159",o:"Hannover (Mitte)",  lat:52.3758,lon:9.732},
+    {p:"49074",o:"Osnabrück (Innenstadt)",lat:52.2726,lon:8.0494},
+    {p:"49076",o:"Osnabrück (Schinkel)",lat:52.2612,lon:8.0711},
+];
+
+// ── NAVIGATION ───────────────────────────────────────────────────────────────
+function zeigePage(id, idx) {
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById('page-'+id).classList.add('active');
+    document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+    if(id==='start')   renderProjListe();
+    if(id==='wetter')  renderProjSelect();
+    if(id==='export')  renderArchiv();
+    // Karte neu berechnen wenn Adresse-Tab aktiviert wird und Karte schon existiert
+    if(id==='adresse' && lMap) setTimeout(()=>lMap.invalidateSize(),250);
+    window.scrollTo(0,0);
+}
+
+// ── PLZ SUCHE ────────────────────────────────────────────────────────────────
+document.getElementById('plz-input').addEventListener('input', function(){
+    const q=this.value.trim().toLowerCase();
+    const w=document.getElementById('plz-wrapper');
+    if(q.length<2){w.style.display='none'; resetAdresse(); return;}
+    const hits=PLZ.filter(x=>x.p.startsWith(q)||x.o.toLowerCase().includes(q));
+    const list=document.getElementById('plz-list');
+    list.innerHTML='';
+    if(!hits.length){w.style.display='none';return;}
+    document.getElementById('plz-hint').style.display=hits.length>4?'block':'none';
+    hits.forEach(item=>{
+        const li=document.createElement('li');
+        li.textContent=item.p+' '+item.o;
+        li.onclick=()=>waehleOrt(item);
+        list.appendChild(li);
+    });
+    w.style.display='flex';
+});
+
+function waehleOrt(item){
+    S.plz=item.p; S.ort=item.o; S.lat=item.lat; S.lon=item.lon;
+    document.getElementById('plz-input').value=item.p+' '+item.o;
+    document.getElementById('ort-input').value=item.o;
+    document.getElementById('plz-wrapper').style.display='none';
+    st('plz-status','✅ '+item.p+' ausgewählt','ok');
+
+    // Karte SOFORT zeigen — noch vor Straßensuche
+    zeigeKarte(item.lat, item.lon, 14);
+
+    // Straßenfeld freischalten
+    const si=document.getElementById('str-input');
+    si.disabled=false; si.placeholder='Straße eintippen…';
+    st('str-status','⏳ Straßen werden geladen…');
+    document.getElementById('str-lademsg').textContent='';
+
+    // Parallele Suche: Overpass zuerst, Nominatim als Fallback
+    ladeStrassenMitFallback(item.p, item.lat, item.lon);
+
+    // Station schon für Ort-Koordinaten suchen
+    sucheStationen(item.lat, item.lon);
+    document.getElementById('btn-speichern').style.display='block';
+}
+
+// ── STRASSEN LADEN (Overpass → Nominatim Fallback) ──────────────────────────
+async function ladeStrassenMitFallback(plz, lat, lon){
+    strCache=[];
+    // Versuch 1: Overpass
+    const ok = await ladeOverpass(plz);
+    if(ok) return;
+    // Versuch 2: Nominatim Bounding-Box Suche
+    st('str-status','⚠️ Lade über Alternativquelle…','warn');
+    await ladeNominatimStrassen(lat, lon, plz);
+}
+
+async function ladeOverpass(plz){
+    try{
+        const q=`[out:json][timeout:20];area["postal_code"="${plz}"]->.a;(way["highway"]["name"](area.a););out tags;`;
+        const r=await fetch('https://overpass-api.de/api/interpreter',{
+            method:'POST',
+            headers:{'Content-Type':'application/x-www-form-urlencoded'},
+            body:'data='+encodeURIComponent(q)
+        });
+        if(!r.ok) return false;
+        const d=await r.json();
+        const s=new Set();
+        d.elements.forEach(el=>{if(el.tags?.name)s.add(el.tags.name);});
+        if(!s.size) return false;
+        strCache=[...s].sort();
+        st('str-status',`✅ ${strCache.length} Straßen geladen`,'ok');
+        return true;
+    }catch{return false;}
+}
+
+async function ladeNominatimStrassen(lat, lon, plz){
+    try{
+        // Nominatim: freie Suche nach Straßen im PLZ-Gebiet via Bounding Box
+        const delta=0.05;
+        const bb=`${lat-delta},${lon-delta},${lat+delta},${lon+delta}`;
+        const url=`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=50&countrycodes=de&bounded=1&viewbox=${lon-delta},${lat+delta},${lon+delta},${lat-delta}&q=Straße`;
+        const r=await fetch(url,{headers:{'Accept-Language':'de'}});
+        const d=await r.json();
+        const s=new Set();
+        d.forEach(item=>{
+            const road=item.address?.road||item.address?.pedestrian||item.address?.footway;
+            if(road && item.address?.postcode===plz) s.add(road);
+        });
+        if(s.size>0){
+            strCache=[...s].sort();
+            st('str-status',`✅ ${strCache.length} Straßen geladen (Alternativquelle)`,'ok');
+        } else {
+            // Letzter Fallback: Straße manuell eingeben, Nominatim sucht live
+            strCache=[];
+            st('str-status','✍️ Straße manuell eintippen – Vorschläge erscheinen automatisch','warn');
+            // Umschalten auf Live-Nominatim Modus
+            document.getElementById('str-input').dataset.mode='live';
+        }
+    }catch{
+        strCache=[];
+        st('str-status','✍️ Straße manuell eintippen','warn');
+        document.getElementById('str-input').dataset.mode='live';
+    }
+}
+
+// ── STRASSEN INPUT ───────────────────────────────────────────────────────────
+document.getElementById('str-input').addEventListener('input', function(){
+    const q=this.value.trim();
+    const mode=this.dataset.mode;
+    if(mode==='live'){
+        // Nominatim Live-Suche (wenn kein Cache)
+        clearTimeout(dbTimer);
+        if(q.length<3){document.getElementById('str-wrapper').style.display='none';return;}
+        dbTimer=setTimeout(()=>sucheStrasseLive(q),400);
+    } else {
+        // Cache-Filterung
+        const w=document.getElementById('str-wrapper');
+        const list=document.getElementById('str-list');
+        list.innerHTML='';
+        if(q.length<2||!strCache.length){w.style.display='none';return;}
+        const hits=strCache.filter(n=>n.toLowerCase().includes(q.toLowerCase())).slice(0,30);
+        if(!hits.length){w.style.display='none';return;}
+        hits.forEach(name=>{
+            const li=document.createElement('li');
+            li.textContent=name;
+            li.onclick=()=>waehleStrasse(name);
+            list.appendChild(li);
+        });
+        w.style.display='flex';
+    }
+});
+
+async function sucheStrasseLive(q){
+    try{
+        const url=`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=de&limit=15&q=${encodeURIComponent(q+' '+S.plz)}`;
+        const r=await fetch(url,{headers:{'Accept-Language':'de'}});
+        const d=await r.json();
+        const s=new Set();
+        d.forEach(item=>{
+            const road=item.address?.road||item.address?.pedestrian||item.address?.footway;
+            if(road) s.add(road);
+        });
+        const list=document.getElementById('str-list');
+        const w=document.getElementById('str-wrapper');
+        list.innerHTML='';
+        if(!s.size){w.style.display='none';return;}
+        [...s].forEach(name=>{
+            const li=document.createElement('li');
+            li.textContent=name;
+            li.onclick=()=>waehleStrasse(name);
+            list.appendChild(li);
+        });
+        w.style.display='flex';
+    }catch{}
+}
+
+function waehleStrasse(name){
+    S.strasse=name;
+    document.getElementById('str-input').value=name;
+    document.getElementById('str-wrapper').style.display='none';
+    st('str-status','✅ Straße gewählt','ok');
+    const hi=document.getElementById('hnr-input');
+    hi.disabled=false; hi.placeholder='⏳ Hausnummern laden…';
+    st('hnr-status','Hausnummern werden geladen…');
+    ladeHnr(S.plz, name);
+}
+
+// ── HAUSNUMMERN (Overpass → Nominatim Fallback) ──────────────────────────────
+async function ladeHnr(plz, strasse){
+    hnrCache=[];
+    const ok=await ladeHnrOverpass(plz, strasse);
+    if(!ok) await ladeHnrNominatim(strasse, plz);
+}
+
+async function ladeHnrOverpass(plz, strasse){
+    try{
+        const q=`[out:json][timeout:20];area["postal_code"="${plz}"]->.a;(node["addr:street"="${strasse}"]["addr:housenumber"](area.a););out body;`;
+        const r=await fetch('https://overpass-api.de/api/interpreter',{
+            method:'POST',
+            headers:{'Content-Type':'application/x-www-form-urlencoded'},
+            body:'data='+encodeURIComponent(q)
+        });
+        if(!r.ok) return false;
+        const d=await r.json();
+        d.elements.forEach(el=>{
+            if(el.tags?.['addr:housenumber'])
+                hnrCache.push({nr:el.tags['addr:housenumber'],lat:el.lat,lon:el.lon});
+        });
+        if(!hnrCache.length) return false;
+        sortHnr();
+        renderHnr(hnrCache);
+        st('hnr-status',`✅ ${hnrCache.length} Hausnummern geladen`,'ok');
+        document.getElementById('hnr-input').placeholder='Filtern oder scrollen…';
+        return true;
+    }catch{return false;}
+}
+
+async function ladeHnrNominatim(strasse, plz){
+    try{
+        const url=`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=de&limit=50&q=${encodeURIComponent(strasse+', '+plz)}`;
+        const r=await fetch(url,{headers:{'Accept-Language':'de'}});
+        const d=await r.json();
+        d.forEach(item=>{
+            if(item.address?.house_number && item.address?.postcode===plz)
+                hnrCache.push({nr:item.address.house_number,lat:parseFloat(item.lat),lon:parseFloat(item.lon)});
+        });
+        sortHnr();
+        if(hnrCache.length){
+            renderHnr(hnrCache);
+            st('hnr-status',`✅ ${hnrCache.length} Hausnummern (Alternativquelle)`,'ok');
+            document.getElementById('hnr-input').placeholder='Filtern oder scrollen…';
+        } else {
+            st('hnr-status','✍️ Hausnummer manuell eingeben → Pin auf Karte setzen','warn');
+            document.getElementById('hnr-input').placeholder='Manuell eingeben…';
+            document.getElementById('hnr-input').disabled=false;
+        }
+    }catch{
+        st('hnr-status','✍️ Hausnummer manuell eingeben','warn');
+        document.getElementById('hnr-input').placeholder='Manuell eingeben…';
+        document.getElementById('hnr-input').disabled=false;
+    }
+}
+
+function sortHnr(){
+    hnrCache.sort((a,b)=>{
+        const na=parseInt(a.nr)||0,nb=parseInt(b.nr)||0;
+        return na!==nb?na-nb:a.nr.localeCompare(b.nr);
+    });
+}
+
+function renderHnr(liste){
+    const w=document.getElementById('hnr-wrapper');
+    const list=document.getElementById('hnr-list');
+    list.innerHTML='';
+    if(!liste.length){w.style.display='none';return;}
+    liste.forEach(item=>{
+        const li=document.createElement('li');
+        li.textContent=item.nr;
+        li.onclick=()=>waehleHnr(item);
+        list.appendChild(li);
+    });
+    w.style.display='flex';
+}
+
+document.getElementById('hnr-input').addEventListener('input', function(){
+    const q=this.value.trim();
+    if(hnrCache.length) renderHnr(q?hnrCache.filter(x=>x.nr.startsWith(q)):hnrCache);
+});
+
+function waehleHnr(item){
+    S.hausnr=item.nr; S.lat=item.lat; S.lon=item.lon;
+    document.getElementById('hnr-input').value=item.nr;
+    document.getElementById('hnr-wrapper').style.display='none';
+    st('hnr-status','🎯 Adresse exakt verifiziert','ok');
+    zeigeKarte(item.lat, item.lon, 17);
+    sucheStationen(item.lat, item.lon);
+}
+
+// ── KARTE ────────────────────────────────────────────────────────────────────
+function zeigeKarte(lat, lon, zoom){
+    const block=document.getElementById('karte-block');
+    block.style.display='block';
+
+    if(!lMap){
+        // Karte erst initialisieren wenn Container sichtbar ist
+        setTimeout(()=>{
+            lMap=L.map('map-small',{zoomControl:true}).setView([lat,lon],zoom);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+                attribution:'© OSM', maxZoom:19
+            }).addTo(lMap);
+            lMap.on('click',e=>{
+                S.lat=e.latlng.lat; S.lon=e.latlng.lng;
+                setzePinKarte(e.latlng.lat, e.latlng.lng);
+                document.getElementById('map-status').textContent=
+                    `📍 Pin: ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
+                sucheStationen(e.latlng.lat, e.latlng.lng);
+                document.getElementById('btn-speichern').style.display='block';
+            });
+            setzePinKarte(lat, lon);
+            lMap.invalidateSize();
+        }, 50);
+    } else {
+        lMap.setView([lat,lon],zoom);
+        setzePinKarte(lat,lon);
+        setTimeout(()=>lMap.invalidateSize(),150);
+    }
+}
+
+function setzePinKarte(lat,lon){
+    if(!lMap) return;
+    if(lMarker) lMarker.setLatLng([lat,lon]);
+    else lMarker=L.marker([lat,lon],{draggable:true}).addTo(lMap);
+    lMarker.off('dragend').on('dragend',e=>{
+        const p=e.target.getLatLng();
+        S.lat=p.lat; S.lon=p.lng;
+        sucheStationen(p.lat,p.lng);
+        document.getElementById('map-status').textContent=
+            `📍 ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+    });
+}
+
+// ── STATIONSSUCHE ────────────────────────────────────────────────────────────
+async function sucheStationen(lat,lon){
+    const block=document.getElementById('station-block');
+    const liste=document.getElementById('station-liste');
+    block.style.display='block';
+    liste.innerHTML='<div class="sl">⏳ Stationen werden gesucht…</div>';
+    try{
+        const r=await fetch(`https://api.brightsky.dev/sources?lat=${lat}&lon=${lon}&max_dist=50000`);
+        const d=await r.json();
+        if(!d.sources?.length){liste.innerHTML='<div class="sl warn">Keine Stationen gefunden</div>';return;}
+        const top=d.sources.slice(0,5);
+        liste.innerHTML='';
+        S.station=top[0];
+        top.forEach((s,i)=>{
+            const km=(s.distance/1000).toFixed(1);
+            const div=document.createElement('div');
+            div.className='station-item'+(i===0?' selected':'');
+            div.innerHTML=`<div class="sdot"></div>
+                <div><div class="sname">${s.station_name||s.dwd_station_id}</div>
+                <div class="smeta">ID ${s.dwd_station_id} · ${s.observation_type}</div></div>
+                <div class="sdist">${km} km</div>`;
+            div.onclick=()=>{
+                document.querySelectorAll('.station-item').forEach(x=>x.classList.remove('selected'));
+                div.classList.add('selected'); S.station=s;
+                st('station-status',`✅ ${s.station_name||s.dwd_station_id} (${km} km)`,'ok');
+            };
+            liste.appendChild(div);
+        });
+        st('station-status',`✅ ${top[0].station_name} (${(top[0].distance/1000).toFixed(1)} km) vorausgewählt`,'ok');
+    }catch{liste.innerHTML='<div class="sl warn">⚠️ Stationssuche fehlgeschlagen</div>';}
+}
+
+// ── PROJEKT SPEICHERN / LADEN ─────────────────────────────────────────────────
+function bauvorhabenSpeichern(){
+    if(!S.lat||!S.lon){alert('Bitte mindestens einen Ort oder Karten-Pin wählen.');return;}
+    const vNr=document.getElementById('vorgangs-nr').value.trim()||('BW-'+Date.now());
+    const p={id:Date.now(),vNr,plz:S.plz,ort:S.ort,strasse:S.strasse,hausnr:S.hausnr,
+        lat:S.lat,lon:S.lon,station:S.station,aktiv:true,
+        angelegt:new Date().toLocaleDateString('de-DE')};
+    const arr=ladeProjekte(); arr.push(p); speichereProjekte(arr);
+    alert(`✅ "${vNr}" gespeichert!`);
+    zeigePage('start',0);
+}
+
+function renderProjListe(){
+    const el=document.getElementById('proj-liste');
+    const p=ladeProjekte();
+    if(!p.length){el.innerHTML='<div class="empty"><span class="ee">📋</span>Noch kein Projekt.</div>';return;}
+    el.innerHTML='';
+    p.forEach(proj=>{
+        const d=document.createElement('div');
+        d.className='pi'+(proj.aktiv?' ap':'');
+        d.innerHTML=`<div style="font-size:22px">🏗️</div>
+            <div class="pinfo">
+                <div class="ptit">${proj.vNr} · ${proj.ort}</div>
+                <div class="pmeta">${proj.strasse||'—'} ${proj.hausnr||''} · ${proj.angelegt}</div>
+                <div class="pmeta" style="font-size:10px;color:#94a3b8">
+                    ${proj.lat?.toFixed(4)||'—'}, ${proj.lon?.toFixed(4)||'—'}
+                    ${proj.station?' · '+( proj.station.station_name||proj.station.dwd_station_id):''}
+                </div>
+            </div>
+            <span class="pbadge ${proj.aktiv?'ak':'in'}" onclick="toggleAktiv(${proj.id},event)">${proj.aktiv?'Aktiv':'Inaktiv'}</span>`;
+        el.appendChild(d);
+    });
+}
+
+function toggleAktiv(id,e){
+    e.stopPropagation();
+    const p=ladeProjekte().map(x=>{if(x.id===id)x.aktiv=!x.aktiv;return x;});
+    speichereProjekte(p); renderProjListe();
+}
+
+function renderProjSelect(){
+    const sel=document.getElementById('proj-select');
+    const p=ladeProjekte().filter(x=>x.aktiv);
+    sel.innerHTML='<option value="">— Projekt wählen —</option>';
+    p.forEach(x=>{
+        const o=document.createElement('option');
+        o.value=x.id; o.textContent=`${x.vNr} · ${x.ort} · ${x.strasse||'(kein Straße)'}`;
+        sel.appendChild(o);
+    });
+}
+
+// ── WETTERDATEN ───────────────────────────────────────────────────────────────
+function getCfg(){return{
+    tau: +document.getElementById('set-tau').value||3,
+    wg:  +document.getElementById('set-wg').value||40,
+    wr:  +document.getElementById('set-wr').value||50,
+    rf:  +document.getElementById('set-rf').value||85
+};}
+
+function getProjW(){
+    const id=+document.getElementById('proj-select').value;
+    return ladeProjekte().find(x=>x.id===id)||null;
+}
+
+async function ladeWetter(isProg){
+    const proj=getProjW(), datum=document.getElementById('datum-input').value;
+    if(!proj){alert('Bitte Projekt wählen.');return;}
+    if(!datum){alert('Bitte Datum wählen.');return;}
+    const loader=document.getElementById('loader');
+    const fban=document.getElementById('fban');
+    loader.style.display='block';
+    document.getElementById('ampel-block').style.display='none';
+    document.getElementById('result-wrap').innerHTML='';
+    fban.style.display='none';
+    try{
+        const url=`https://api.brightsky.dev/weather?lat=${proj.lat}&lon=${proj.lon}&date=${datum}&tz=Europe/Berlin`;
+        const r=await fetch(url);
+        const d=await r.json();
+        if(!d.weather?.length){document.getElementById('result-wrap').innerHTML='<div class="card">Keine Daten verfügbar.</div>';return;}
+        S.wetter=d.weather; S.istProg=isProg;
+        if(isProg){fban.style.display='block';document.getElementById('fts').textContent=new Date().toLocaleString('de-DE');}
+        verarbeiteWetter(d.weather,getCfg());
+    }catch{document.getElementById('result-wrap').innerHTML='<div class="card" style="color:var(--red)">⚠️ Fehler beim Datenabruf. Netzwerk prüfen.</div>';}
+    finally{loader.style.display='none';}
+}
+
+function ladePrognose(){ladeWetter(true);}
+
+function verarbeiteWetter(daten,cfg){
+    const nurKern=document.getElementById('bereich-select').value==='kern';
+    let zR=0,zL=0,zF=0,zS=0,zT=0,zK=0;
+    let temps=[],taus=[],rfs=[],boen=[],winde=[],regen=[],kRH=0;
+
+    daten.forEach(h=>{
+        const hr=new Date(h.timestamp).getHours();
+        const kern=hr>=7&&hr<=16;
+        const tmp=h.temperature??0, rf=h.relative_humidity??0;
+        const boe=Math.round((h.wind_gust_speed??0)*3.6);
+        const wnd=Math.round((h.wind_speed??0)*3.6);
+        const prec=h.precipitation??0;
+        const tau=parseFloat(tp(tmp,rf));
+        temps.push(tmp);taus.push(tau);rfs.push(rf);
+        boen.push(boe);winde.push(wnd);regen.push(prec);
+        if(kern){
+            if(prec>0.2)zR++;else if(prec>0)zL++;
+            if(tmp<=0)zF++;
+            if(boe>=cfg.wr)zK++;else if(boe>=cfg.wg)zS++;
+            if((tmp-tau)<cfg.tau||rf>cfg.rf)zT++;
+            if(prec>0)kRH++;
+        }
+    });
+
+    // Kompaktwerte
+    const avg=a=>(a.reduce((s,x)=>s+x,0)/a.length).toFixed(1);
+    const mn=a=>Math.min(...a).toFixed(1), mx=a=>Math.max(...a).toFixed(1);
+    const sum=a=>a.reduce((s,x)=>s+x,0).toFixed(1);
+    document.getElementById('k-temp').textContent=avg(temps)+' °C';
+    document.getElementById('k-temp-r').textContent=mn(temps)+' / '+mx(temps)+' °C';
+    document.getElementById('k-tau').textContent=avg(taus)+' °C';
+    document.getElementById('k-tau-r').textContent=mn(taus)+' / '+mx(taus)+' °C';
+    document.getElementById('k-rf').textContent=avg(rfs)+' %';
+    document.getElementById('k-rf-r').textContent=mn(rfs)+' / '+mx(rfs)+' %';
+    document.getElementById('k-wind').textContent=mx(boen)+' km/h';
+    document.getElementById('k-wind-r').textContent='⌀ '+avg(winde)+' km/h';
+    document.getElementById('k-regen').textContent=sum(regen)+' mm';
+    document.getElementById('k-regen-r').textContent=kRH+' Kernzeit-Stunden mit Niederschlag';
+
+    // Ampeln
+    setAmpel('amp-chemie',zF>0||zR>0?'rot':zT>3||zL>0?'orange':zT>0?'gelb':'gruen');
+    setAmpel('amp-bitumen',zF>2||zR>2?'rot':zR>0||zF>0?'orange':zL>0?'gelb':'gruen');
+    setAmpel('amp-montage',zK>0||zR>4?'rot':zS>0||zR>1?'orange':zL>0?'gelb':'gruen');
+    document.getElementById('ampel-block').style.display='block';
+
+    // Stundenkarten
+    const wrap=document.getElementById('result-wrap');
+    wrap.innerHTML='';
+    daten.forEach(h=>{
+        const hr=new Date(h.timestamp).getHours();
+        const kern=hr>=7&&hr<=16;
+        if(nurKern&&!kern)return;
+        const hrS=hr.toString().padStart(2,'0')+':00';
+        const tmp=h.temperature??0, rf=h.relative_humidity??0;
+        const boe=Math.round((h.wind_gust_speed??0)*3.6);
+        const wnd=Math.round((h.wind_speed??0)*3.6);
+        const prec=h.precipitation??0;
+        const tau=tp(tmp,rf);
+        const tA=tmp-parseFloat(tau);
+        let kls=kern?'kern':'', hint='Regulärer Bauablauf möglich.';
+
+        if(tmp<=0){kls='krit';hint='❄️ <b>Frostgefahr!</b> Wasserbasierte Systeme gesperrt. Rutschgefahr beachten.';}
+        else if(prec>0.2){kls='krit';hint=`🌧️ <b>Niederschlag ${prec} mm/h.</b> Flächen sichern. Ausweicharbeiten prüfen.`;}
+        else if(prec>0){if(kern)kls='warn';hint=`🌦️ Leichter Niederschlag (${prec} mm/h). Bitumen: Untergrund per Brenner vortrocknen möglich. Keine Flüssigkunststoffe.`;}
+        else if(tA<cfg.tau){if(kern)kls='warn';hint=`💧 <b>Kondensatrisiko!</b> Taupunktabstand ${tA.toFixed(1)} °C. Flüssigkunststoff-Verarbeitung sperren.`;}
+        else if(rf>cfg.rf){if(kern)kls='warn';hint=`💦 Hohe Luftfeuchte ${rf}%. Keine Beschichtungsarbeiten.`;}
+        else if(boe>=cfg.wr){kls='krit';hint=`🌬️ <b>Sturm! Böe ${boe} km/h.</b> Kranbetrieb einstellen (DGUV). Dach räumen.`;}
+        else if(boe>=cfg.wg){if(kern)kls='warn';hint=`💨 Böen ${boe} km/h. Lose Materialien sichern. Kranbetrieb überwachen.`;}
+
+        const c=document.createElement('div');
+        c.className='hc '+kls;
+        c.innerHTML=`<div class="tc">
+            <div class="thr">${hrS}</div>
+            <span class="tbadge ${kern?'core':''}">${kern?'KERN':'NACHT'}</span>
+        </div>
+        <div class="dc">
+            <div class="cl">${condTxt(h.condition,prec)}</div>
+            <div><b>Luft:</b> ${tmp.toFixed(1)} °C</div>
+            <div><b>Taupunkt:</b> ${tau} °C</div>
+            <div><b>r.F.:</b> ${rf} %</div>
+            <div><b>Böe:</b> ${boe} km/h</div>
+            <div class="pn"><b>Praxis:</b> ${hint}</div>
+        </div>`;
+        wrap.appendChild(c);
+    });
+}
+
+// ── HELFER ───────────────────────────────────────────────────────────────────
+function tp(temp,rf){
+    const a=17.625,b=243.04;
+    const al=((a*temp)/(b+temp))+Math.log(rf/100);
+    return ((b*al)/(a-al)).toFixed(1);
+}
+function condTxt(cond,prec){
+    if(!prec||prec===0)return'☀️ Trocken';
+    switch(cond){
+        case'rain': return`🌧️ Regen (${prec} mm/h)`;
+        case'snow': return`❄️ Schnee (${prec} mm/h)`;
+        case'sleet':return`🌨️ Schneeregen (${prec} mm/h)`;
+        case'hail': return`⛈️ Hagel/Graupel (${prec} mm/h)`;
+        default:    return`🌦️ Niederschlag (${prec} mm/h)`;
+    }
+}
+function setAmpel(id,s){
+    const e=document.getElementById(id);
+    e.className='ab '+s;
+}
+function st(id,txt,cls=''){
+    const e=document.getElementById(id);
+    if(!e)return;
+    e.textContent=txt;
+    e.className='sl'+(cls?' '+cls:'');
+}
+function resetAdresse(){
+    S.plz='';S.ort='';S.strasse='';S.hausnr='';S.lat=null;S.lon=null;S.station=null;
+    document.getElementById('ort-input').value='';
+    ['str-input','hnr-input'].forEach(id=>{
+        const e=document.getElementById(id);
+        e.value='';e.disabled=true;e.dataset.mode='';
+    });
+    document.getElementById('str-input').placeholder='Erst PLZ wählen…';
+    document.getElementById('hnr-input').placeholder='Straße wählen…';
+    ['str-status','hnr-status'].forEach(id=>st(id,'Gesperrt'));
+    document.getElementById('karte-block').style.display='none';
+    document.getElementById('station-block').style.display='none';
+    document.getElementById('btn-speichern').style.display='none';
+    if(lMarker&&lMap){lMap.removeLayer(lMarker);lMarker=null;}
+}
+
+// ── EXPORT ───────────────────────────────────────────────────────────────────
+function exportText(){
+    if(!S.wetter){alert('Zuerst Wetterdaten abrufen.');return;}
+    const proj=getProjW(), datum=document.getElementById('datum-input').value;
+    let t=`BauWetter-Protokoll\n${'─'.repeat(40)}\n`;
+    t+=`Vorgangs-Nr.: ${proj?.vNr||'—'}\nOrt: ${proj?.ort||'—'} · ${proj?.strasse||''} ${proj?.hausnr||''}\n`;
+    t+=`Datum: ${datum}${S.istProg?' (PROGNOSE – kein Messwert!)':''}\n`;
+    t+=`Bauherr: ${document.getElementById('exp-bauherr').value||'—'}\n`;
+    t+=`Mitarbeiter: ${document.getElementById('exp-ma').value||'—'}\n`;
+    t+=`Polier: ${document.getElementById('exp-polier').value||'—'}\n`;
+    t+=`Meister: ${document.getElementById('exp-meister').value||'—'}\n\n`;
+    t+=`Kernzeit-Protokoll (07–16 Uhr):\n${'─'.repeat(40)}\n`;
+    S.wetter.forEach(h=>{
+        const hr=new Date(h.timestamp).getHours();
+        if(hr<7||hr>16)return;
+        t+=`${hr.toString().padStart(2,'0')}:00 | ${(h.temperature??0).toFixed(1)}°C | ${h.relative_humidity??0}% r.F. | Böe ${Math.round((h.wind_gust_speed??0)*3.6)} km/h | ${h.precipitation??0} mm/h\n`;
+    });
+    t+=`\n${'─'.repeat(40)}\n⚖️ Dieses Protokoll dokumentiert DWD-Messwerte als Argumentationshilfe. Entscheidungen über Arbeitsunterbrechungen obliegen dem Vorarbeiter/Polier vor Ort.`;
+    navigator.clipboard?.writeText(t).then(()=>alert('✅ In Zwischenablage kopiert!')).catch(()=>alert(t));
+}
+
+function renderArchiv(){
+    const el=document.getElementById('archiv-liste');
+    const a=JSON.parse(localStorage.getItem('bw_archiv')||'[]');
+    if(!a.length){el.innerHTML='<div class="empty"><span class="ee">📁</span>Noch keine Berichte.</div>';return;}
+    el.innerHTML='';
+    a.forEach((item,i)=>{
+        const d=document.createElement('div');
+        d.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px';
+        d.innerHTML=`<span>📁 ${item.datum} · ${item.ort}</span>
+            <button onclick="archivDel(${i})" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer">Löschen</button>`;
+        el.appendChild(d);
+    });
+}
+
+function archivDel(i){
+    const a=JSON.parse(localStorage.getItem('bw_archiv')||'[]');
+    a.splice(i,1); localStorage.setItem('bw_archiv',JSON.stringify(a)); renderArchiv();
+}
+
+// ── STORAGE ──────────────────────────────────────────────────────────────────
+function ladeProjekte(){return JSON.parse(localStorage.getItem('bw_projekte')||'[]');}
+function speichereProjekte(p){localStorage.setItem('bw_projekte',JSON.stringify(p));}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+document.getElementById('datum-input').value=new Date().toISOString().split('T')[0];
+document.addEventListener('click',e=>{
+    if(!e.target.closest('.fg'))
+        document.querySelectorAll('.dw').forEach(w=>w.style.display='none');
+});
+renderProjListe();
+</script>
+</body>
+</html>
